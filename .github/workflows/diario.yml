@@ -7,6 +7,10 @@ on:
 jobs:
   update-data:
     runs-on: ubuntu-latest
+    # --- AÑADE ESTAS DOS LÍNEAS AQUÍ ---
+    permissions:
+      contents: write
+    # ------------------------------------
     steps:
       - name: Descargar el código del repo
         uses: actions/checkout@v3
