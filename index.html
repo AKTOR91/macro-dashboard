@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Macro USA — Producción</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --bg-card: #161b22; --bg-card-hover: #1c2129;
+    --border: #30363d; --border-soft: #21262d;
+    --text: #e6edf3; --text-dim: #8b949e;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+    --blue: #58a6ff; --purple: #bc8cff; --orange: #ff9e64;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; padding: 24px; max-width: 1600px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  header .meta { text-align: right; font-size: 12px; color: var(--text-dim); }
+  header .meta .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: middle; }
+  .regime-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; margin-bottom: 16px; position: relative; overflow: hidden; }
+  .regime-panel::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--regime-color, var(--green)); }
+  .regime-top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
+  .regime-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 6px; }
+  .regime-name { font-size: 30px; font-weight: 700; color: var(--regime-color, var(--green)); letter-spacing: -0.5px; line-height: 1.1; }
+  .regime-description { color: var(--text-dim); font-size: 14px; max-width: 720px; margin-top: 8px; }
+  .regime-scores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .score-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; }
+  .score-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
+  .score-box .value { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .score-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  
+  /* ESTILOS DEL CALENDARIO */
+  .week-calendar { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-bottom: 20px; }
+  .week-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .week-header .title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 600; }
+  .week-header .hint { font-size: 11px; color: var(--text-dim); }
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .week-day { background: rgba(255,255,255,0.02); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 10px 12px; min-height: 96px; }
+  .week-day.today { border-color: var(--blue); background: rgba(88,166,255,0.06); }
+  .week-day.past { opacity: 0.6; }
+  .week-day-label { font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; font-weight: 600; letter-spacing: 0.5px; }
+  .week-day.today .week-day-label { color: var(--blue); }
+  .week-day-items { display: flex; flex-direction: column; gap: 6px; }
+  .week-item { display: flex; justify-content: space-between; align-items: center; font-size: 11px; gap: 4px; line-height: 1.3; }
+  .event-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .event-forecast { color: var(--blue); font-weight: 600; flex-shrink: 0; }
+  .week-empty { font-size: 11px; color: var(--text-dim); opacity: 0.5; font-style: italic; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { background: transparent; border: none; color: var(--text-dim); padding: 12px 18px; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; font-family: inherit; transition: color 0.15s, border-color 0.15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--blue); font-weight: 600; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .indicators-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .indicator-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; transition: border-color 0.2s, background 0.2s; }
+  .indicator-card:hover { border-color: #484f58; background: var(--bg-card-hover); }
+  .indicator-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .indicator-card .name { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+  .semaphore { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .semaphore.green { background: var(--green); box-shadow: 0 0 8px rgba(63,185,80,0.5); }
+  .semaphore.yellow { background: var(--yellow); box-shadow: 0 0 8px rgba(210,153,34,0.5); }
+  .semaphore.red { background: var(--red); box-shadow: 0 0 8px rgba(248,81,73,0.5); }
+  .indicator-card .main { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; margin-bottom: 10px; }
+  .indicator-card .value-line { display: flex; align-items: baseline; gap: 8px; }
+  .indicator-card .value { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  .indicator-card .delta { font-size: 12px; font-weight: 500; }
+  .indicator-card .delta.up { color: var(--green); }
+  .indicator-card .delta.down { color: var(--red); }
+  .indicator-card .delta.flat { color: var(--text-dim); }
+  .indicator-card .explain { font-size: 10.5px; color: var(--text-dim); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; min-height: 28px; }
+  .indicator-card .next-release { font-size: 10.5px; color: var(--text-dim); padding-top: 9px; border-top: 1px solid var(--border-soft); display: flex; align-items: center; gap: 5px; }
+  .indicator-card .next-release .ico { opacity: 0.7; }
+  .sparkline { flex-shrink: 0; }
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px; }
+  .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; }
+  .chart-container { height: 280px; width: 100%; }
+  footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim); text-align: center; }
+  @media (max-width: 900px) { .week-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 640px) { body { padding: 12px; } .regime-name { font-size: 24px; } .regime-scores { grid-template-columns: 1fr; } .charts-grid { grid-template-columns: 1fr; } .chart-container { height: 220px; } header .meta { text-align: left; } .tab-btn { padding: 10px 12px; font-size: 12px; } .week-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Dashboard Macro USA</h1>
+    <div class="subtitle">Referencia para swing trading 5–15 días · Acciones americanas</div>
+  </div>
+  <div class="meta">
+    <div><span class="dot"></span><strong>Actualizado</strong> · <span id="lastUpdate">Cargando...</span></div>
+    <div style="margin-top:4px;">Datos reales FRED + Yahoo</div>
+  </div>
+</header>
+
+<section class="regime-panel" id="regimePanel">
+  <div class="regime-top">
+    <div>
+      <div class="regime-label">Régimen económico</div>
+      <div class="regime-name" id="regimeName">—</div>
+      <div class="regime-description" id="regimeDesc">—</div>
+    </div>
+  </div>
+  <div class="regime-scores">
+    <div class="score-box">
+      <div class="label">Score de Crecimiento</div>
+      <div class="value" id="growthScore">—</div>
+      <div class="score-bar"><div class="score-bar-fill" id="growthBar" style="background:var(--green);width:0%"></div></div>
+    </div>
+    <div class="score-box">
+      <div class="label">Score de Inflación</div>
+      <div class="value" id="inflationScore">—</div>
+      <div class="score-bar"><div class="score-bar-fill" id="inflationBar" style="background:var(--red);width:0%"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="week-calendar">
+  <div class="week-header">
+    <div class="title">Publicaciones esta semana</div>
+    <div class="hint" id="weekHint">—</div>
+  </div>
+  <div class="week-grid" id="weekGrid"></div>
+</section>
+
+<nav class="tabs" role="tablist">
+  <button class="tab-btn active" data-tab="growth">A · Crecimiento y actividad</button>
+  <button class="tab-btn" data-tab="inflation">B · Inflación y precios</button>
+  <button class="tab-btn" data-tab="rates">C · Tipos y liquidez</button>
+  <button class="tab-btn" data-tab="risk">D · Riesgo, dólar y condiciones</button>
+</nav>
+
+<section id="tab-growth" class="tab-content active">
+  <div class="indicators-grid" id="grid-growth"></div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3>GDP real (QoQ anualizado)</h3><div class="chart-container" id="chartGdp"></div></div>
+    <div class="chart-card"><h3>NFP · variación mensual + media 3M</h3><div class="chart-container" id="chartNfp"></div></div>
+    <div class="chart-card" style="grid-column: 1 / -1;"><h3>ISM proxies (Philly Fed + Empire State) · nivel 50 = expansión</h3><div class="chart-container" id="chartIsm"></div></div>
+  </div>
+</section>
+
+<section id="tab-inflation" class="tab-content">
+  <div class="indicators-grid" id="grid-inflation"></div>
+  <div class="charts-grid">
+    <div class="chart-card" style="grid-column: 1 / -1;"><h3>Inflación interanual · CPI / Core CPI / PCE / Core PCE</h3><div class="chart-container" id="chartInflation" style="height: 340px;"></div></div>
+  </div>
+</section>
+
+<section id="tab-rates" class="tab-content">
+  <div class="indicators-grid" id="grid-rates"></div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3>Treasury Yields · 1Y / 2Y / 5Y / 10Y</h3><div class="chart-container" id="chartYields"></div></div>
+    <div class="chart-card"><h3>Curva 10Y − 2Y</h3><div class="chart-container" id="chartCurve"></div></div>
+    <div class="chart-card"><h3>Fed Funds Rate (step)</h3><div class="chart-container" id="chartFedFunds"></div></div>
+    <div class="chart-card"><h3>FedWatch proxy · próximas 3 reuniones FOMC</h3><div class="chart-container" id="chartFedWatch"></div></div>
+  </div>
+</section>
+
+<section id="tab-risk" class="tab-content">
+  <div class="indicators-grid" id="grid-risk"></div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3>VIX · niveles 20 / 30</h3><div class="chart-container" id="chartVix"></div></div>
+    <div class="chart-card"><h3>Dollar Index (DXY)</h3><div class="chart-container" id="chartDxy"></div></div>
+    <div class="chart-card"><h3>High Yield Credit Spread</h3><div class="chart-container" id="chartHySpread"></div></div>
+    <div class="chart-card"><h3>M2 Money Supply (YoY)</h3><div class="chart-container" id="chartM2"></div></div>
+  </div>
+</section>
+
+<footer>Datos obtenidos automáticamente de la API de la Reserva Federal (FRED) y Yahoo Finance.</footer>
+
+<script>
+let dashboardData = null;
+const TODAY_ISO = new Date().toISOString().split('T')[0];
+
+const indicatorDefs = {
+  growth: [
+    { key:'gdp', name:'GDP real (QoQ anual.)', unit:'%', decimals:1, good: v => v > 2.0 ? 'green' : v > 0.5 ? 'yellow' : 'red', desc: 'PIB trimestral anualizado. Termómetro general de la economía.', nextRelease: '' },
+    { key:'ismMfg', name:'ISM Mfg (proxy)', unit:'', decimals:1, good: v => v > 52 ? 'green' : v > 48 ? 'yellow' : 'red', desc: 'Actividad manufacturera. >50 señala expansión.', nextRelease: '' },
+    { key:'ismSvcs', name:'ISM Svcs (proxy)', unit:'', decimals:1, good: v => v > 52 ? 'green' : v > 48 ? 'yellow' : 'red', desc: 'Actividad del sector servicios. >50 = expansión.', nextRelease: '' },
+    { key:'nfp', name:'Empleos creados (NFP)', unit:'k', decimals:0, good: v => v > 150 ? 'green' : v > 50 ? 'yellow' : 'red', desc: 'Empleos creados al mes (Nóminas no agrícolas). Clave para la Fed.', nextRelease: '' },
+  ],
+  inflation: [
+    { key:'cpi', name:'CPI interanual', unit:'%', decimals:1, good: v => v < 2.5 ? 'green' : v < 3.5 ? 'yellow' : 'red', desc: 'Precios al consumidor. La medida más seguida.', nextRelease: '' },
+    { key:'coreCpi', name:'Core CPI interanual', unit:'%', decimals:1, good: v => v < 3.0 ? 'green' : v < 4.0 ? 'yellow' : 'red', desc: 'CPI sin alimentos ni energía. Más estructural.', nextRelease: '' },
+    { key:'pce', name:'PCE interanual', unit:'%', decimals:1, good: v => v < 2.5 ? 'green' : v < 3.5 ? 'yellow' : 'red', desc: 'Gasto personal. La medida preferida de la Fed.', nextRelease: '' },
+    { key:'corePce', name:'Core PCE interanual', unit:'%', decimals:1, good: v => v < 3.0 ? 'green' : v < 4.0 ? 'yellow' : 'red', desc: 'PCE sin alimentos ni energía. Dato clave de la Fed.', nextRelease: '' },
+  ],
+  rates: [
+    { key:'fedFunds', name:'Fed Funds', unit:'%', decimals:2, good: v => v < 5.0 ? 'green' : v < 6.0 ? 'yellow' : 'red', desc: 'Tipo de interés oficial de la Fed. Ancla del mercado.', nextRelease: '' },
+    { key:'yield1y', name:'Treasury 1Y', unit:'%', decimals:2, good: v => v < 4.5 ? 'green' : 'yellow', desc: 'Rentabilidad del bono americano a 1 año.', nextRelease: '' },
+    { key:'yield2y', name:'Treasury 2Y', unit:'%', decimals:2, good: v => v < 4.5 ? 'green' : 'yellow', desc: 'Bono a 2 años. Expectativas de política monetaria.', nextRelease: '' },
+    { key:'yield5y', name:'Treasury 5Y', unit:'%', decimals:2, good: v => v < 4.8 ? 'green' : 'yellow', desc: 'Bono a 5 años. Tramo medio de la curva.', nextRelease: '' },
+    { key:'yield10y', name:'Treasury 10Y', unit:'%', decimals:2, good: v => v > 3.5 && v < 4.8 ? 'green' : 'yellow', desc: 'Bono a 10 años. Referencia global para acciones.', nextRelease: '' },
+    { key:'yieldCurve', name:'Curva 10Y−2Y', unit:'pts', decimals:2, good: v => v > 0 ? 'green' : v > -0.5 ? 'yellow' : 'red', desc: 'Diferencia 10Y − 2Y. Invertida (<0) = recesión.', nextRelease: '' },
+  ],
+  risk: [
+    { key:'vix', name:'VIX', unit:'', decimals:1, good: v => v < 20 ? 'green' : v < 30 ? 'yellow' : 'red', desc: 'Volatilidad implícita del S&P 500. >30 = miedo.', nextRelease: '' },
+    { key:'dxy', name:'Dollar Index', unit:'', decimals:1, good: v => v < 100 ? 'green' : v < 108 ? 'yellow' : 'red', desc: 'Fuerza del dólar. Dólar fuerte presiona multinacionales.', nextRelease: '' },
+    { key:'hySpread', name:'HY Credit Spread', unit:'%', decimals:2, good: v => v < 4.0 ? 'green' : v < 6.0 ? 'yellow' : 'red', desc: 'Diferencial bonos basura vs Treasury. Estrés.', nextRelease: '' },
+    { key:'m2YoY', name:'M2 YoY', unit:'%', decimals:1, good: v => v > 2 ? 'green' : v > 0 ? 'yellow' : 'red', desc: 'Crecimiento anual del dinero. Mide liquidez.', nextRelease: '' },
+  ],
+};
+
+function fmt(v, d) { return Number(v).toFixed(d); }
+function deltaClass(d) { return d > 0.0001 ? 'up' : d < -0.0001 ? 'down' : 'flat'; }
+function deltaArrow(d) { return d > 0.0001 ? '▲' : d < -0.0001 ? '▼' : '—'; }
+
+function sparklineSVG(values, color) {
+  if(!values || values.length < 2) return '';
+  const w = 70, h = 22;
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - ((v - min) / range) * h).toFixed(1)}`).join(' ');
+  return `<svg class="sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+function classifyRegime(c) {
+  let growth = 0;
+  if (c.gdp > 2.0) growth += 2; else if (c.gdp < 0) growth -= 2;
+  if (c.ismMfg > 50) growth += 1; else growth -= 1;
+  if (c.ismSvcs > 50) growth += 1; else growth -= 1;
+  if (c.nfp > 150) growth += 1; else if (c.nfp < 0) growth -= 2;
+
+  let inflation = 0;
+  if (c.cpi > 3.0) inflation += 2; else if (c.cpi < 2.5) inflation -= 1;
+  if (c.coreCpi > 3.0) inflation += 1; else if (c.coreCpi < 2.5) inflation -= 1;
+  if (c.corePce > 3.0) inflation += 1; else if (c.corePce < 2.5) inflation -= 1;
+
+  const hiG = growth > 0, hiI = inflation > 0;
+  let name, color, desc;
+  if (hiG && !hiI) { name = 'Expansión'; color = 'var(--green)'; desc = 'Entorno favorable para renta variable. Crecimiento sostenido con inflación contenida. Sesgo: risk-on.'; }
+  else if (hiG && hiI) { name = 'Sobrecalentamiento'; color = 'var(--yellow)'; desc = 'Crecimiento fuerte con inflación al alza. Riesgo de endurecimiento. Sesgo: cautela, rotación a defensivos.'; }
+  else if (!hiG && hiI) { name = 'Estanflación'; color = 'var(--red)'; desc = 'El peor escenario para acciones: crecimiento débil con inflación alta. Sesgo: risk-off.'; }
+  else { name = 'Recesión / Desinflación'; color = 'var(--blue)'; desc = 'Crecimiento débil con inflación a la baja. Posible suelo de ciclo. Sesgo: selectivo.'; }
+  return { name, color, desc, growth, inflation };
+}
+
+function renderRegime(data) {
+  const r = classifyRegime(data.current);
+  const panel = document.getElementById('regimePanel');
+  panel.style.setProperty('--regime-color', r.color);
+  document.getElementById('regimeName').textContent = r.name;
+  document.getElementById('regimeName').style.color = r.color;
+  document.getElementById('regimeDesc').textContent = r.desc;
+  document.getElementById('growthScore').textContent = (r.growth > 0 ? '+' : '') + r.growth;
+  document.getElementById('growthBar').style.width = Math.min(100, Math.max(0, ((r.growth + 6) / 12) * 100)) + '%';
+  document.getElementById('growthBar').style.background = r.growth > 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('inflationScore').textContent = (r.inflation > 0 ? '+' : '') + r.inflation;
+  document.getElementById('inflationBar').style.width = Math.min(100, Math.max(0, ((r.inflation + 6) / 12) * 100)) + '%';
+  document.getElementById('inflationBar').style.background = r.inflation > 0 ? 'var(--red)' : 'var(--green)';
+}
+
+// NUEVA FUNCIÓN DEL CALENDARIO ADAPTADA A PYTHON
+function renderWeekCalendar(data) {
+  const grid = document.getElementById('weekGrid');
+  grid.innerHTML = '';
+  const weekHint = document.getElementById('weekHint');
+  
+  if (!data.weekEvents || data.weekEvents.length === 0) {
+    weekHint.textContent = 'No hay eventos programados';
+    for (let i = 0; i < 7; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'week-day';
+        cell.innerHTML = `<div class="week-day-label">-</div><div class="week-empty">—</div>`;
+        grid.appendChild(cell);
+    }
+    return;
+  }
+
+  const eventsByDate = {};
+  data.weekEvents.forEach(ev => {
+    if (!eventsByDate[ev.date]) eventsByDate[ev.date] = [];
+    eventsByDate[ev.date].push(ev);
+  });
+
+  // Generamos los próximos 7 días (empezando por el día de hoy)
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    
+    const cell = document.createElement('div');
+    const isToday = i === 0;
+    cell.className = 'week-day' + (isToday ? ' today' : '');
+    
+    const dayLabel = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+    
+    let itemsHtml = '';
+    if (eventsByDate[dateStr]) {
+      eventsByDate[dateStr].forEach(ev => {
+        const forecast = ev.estimate !== null ? ev.estimate : '—';
+        itemsHtml += `
+          <div class="week-item" title="${ev.event}">
+            <span class="event-name">${ev.event}</span>
+            <span class="event-forecast">Est: ${forecast}</span>
+          </div>
+        `;
+      });
+    } else {
+      itemsHtml = '<div class="week-empty">—</div>';
+    }
+
+    cell.innerHTML = `
+      <div class="week-day-label">${dayLabel}${isToday ? ' · hoy' : ''}</div>
+      <div class="week-day-items">${itemsHtml}</div>
+    `;
+    grid.appendChild(cell);
+  }
+  weekHint.textContent = 'Previsiones de consenso';
+}
+
+function renderIndicatorSection(data, sectionKey) {
+  const grid = document.getElementById('grid-' + sectionKey);
+  if (!grid) return;
+  grid.innerHTML = '';
+  indicatorDefs[sectionKey].forEach(def => {
+    const value = data.current[def.key];
+    const delta = data.deltas[def.key] ?? 0;
+    const status = typeof def.good === 'function' ? def.good(value) : 'green';
+    const dClass = deltaClass(delta);
+    const dArrow = deltaArrow(delta);
+    const dValue = def.decimals > 0 ? Math.abs(delta).toFixed(def.decimals) : Math.abs(delta);
+    let spark = '';
+    const hist = data.history[def.key];
+    if (hist && hist.values) {
+      spark = sparklineSVG(hist.values.slice(-20), status === 'green' ? '#3fb950' : status === 'red' ? '#f85149' : '#d29922');
+    }
+    const releaseLabel = def.nextRelease || 'Próximamente';
+    const card = document.createElement('div');
+    card.className = 'indicator-card';
+    card.title = def.desc;
+    card.innerHTML = `
+      <div class="top"><span class="name">${def.name}</span><span class="semaphore ${status}"></span></div>
+      <div class="main"><div class="value-line"><span class="value">${fmt(value, def.decimals)}${def.unit}</span><span class="delta ${dClass}">${dArrow} ${dValue}</span></div>${spark}</div>
+      <div class="explain">${def.desc}</div>
+      <div class="next-release"><span class="ico">📅</span><span>Próx: ${releaseLabel}</span></div>`;
+    grid.appendChild(card);
+  });
+}
+
+const plotLayout = (yTitle) => ({
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#8b949e', size: 11, family: 'inherit' },
+  margin: { l: 45, r: 15, t: 15, b: 35 },
+  xaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d', linecolor: '#30363d' },
+  yaxis: { gridcolor: '#21262d', zerolinecolor: '#30363d', linecolor: '#30363d', title: yTitle ? { text: yTitle, font: { size: 10 } } : undefined },
+  hovermode: 'x unified', showlegend: true, legend: { orientation: 'h', y: -0.18, font: { size: 10 } },
+});
+const PLOT_CONFIG = { displayModeBar: false, responsive: true };
+
+function renderCharts(data) {
+  const h = data.history;
+  if(!h.gdp) return; 
+
+  Plotly.newPlot('chartGdp', [{ x: h.gdp.dates, y: h.gdp.values, type: 'bar', marker: { color: h.gdp.values.map(v => v > 0 ? '#3fb950' : '#f85149') }, name: 'GDP QoQ' }], plotLayout('%'), PLOT_CONFIG);
+  
+  const nfpValues = h.nfp.values;
+  const nfpMa = nfpValues.map((_, i) => i < 2 ? null : (nfpValues[i] + nfpValues[i-1] + nfpValues[i-2]) / 3);
+  Plotly.newPlot('chartNfp', [
+    { x: h.nfp.dates, y: h.nfp.values, type: 'bar', marker: { color: '#58a6ff' }, name: 'NFP' },
+    { x: h.nfp.dates, y: nfpMa, type: 'scatter', mode: 'lines', line: { color: '#bc8cff', width: 2 }, name: 'Media 3M' }
+  ], plotLayout('k'), PLOT_CONFIG);
+
+  Plotly.newPlot('chartIsm', [
+    { x: h.ismMfg.dates, y: h.ismMfg.values, type: 'scatter', mode: 'lines', line: { color: '#58a6ff', width: 2 }, name: 'Mfg (Philly proxy)' },
+    { x: h.ismSvcs.dates, y: h.ismSvcs.values, type: 'scatter', mode: 'lines', line: { color: '#bc8cff', width: 2 }, name: 'Svcs (Empire proxy)' }
+  ], { ...plotLayout(''), shapes: [{ type: 'line', x0: h.ismMfg.dates[0], x1: h.ismMfg.dates[h.ismMfg.dates.length - 1], y0: 50, y1: 50, line: { color: '#484f58', width: 1, dash: 'dot' } }] }, PLOT_CONFIG);
+
+  Plotly.newPlot('chartInflation', [
+    { x: h.cpi.dates, y: h.cpi.values, type: 'scatter', mode: 'lines', line: { color: '#f85149', width: 2 }, name: 'CPI' },
+    { x: h.coreCpi.dates, y: h.coreCpi.values, type: 'scatter', mode: 'lines', line: { color: '#ff9e64', width: 2 }, name: 'Core CPI' },
+    { x: h.pce.dates, y: h.pce.values, type: 'scatter', mode: 'lines', line: { color: '#58a6ff', width: 2 }, name: 'PCE' },
+    { x: h.corePce.dates, y: h.corePce.values, type: 'scatter', mode: 'lines', line: { color: '#bc8cff', width: 2 }, name: 'Core PCE' }
+  ], { ...plotLayout('%'), shapes: [{ type: 'line', x0: h.cpi.dates[0], x1: h.cpi.dates[h.cpi.dates.length - 1], y0: 2, y1: 2, line: { color: '#3fb950', width: 1, dash: 'dot' } }] }, PLOT_CONFIG);
+
+  Plotly.newPlot('chartYields', [
+    { x: h.yield1y.dates, y: h.yield1y.values, type: 'scatter', mode: 'lines', line: { color: '#3fb950', width: 2 }, name: '1Y' },
+    { x: h.yield2y.dates, y: h.yield2y.values, type: 'scatter', mode: 'lines', line: { color: '#d29922', width: 2 }, name: '2Y' },
+    { x: h.yield5y.dates, y: h.yield5y.values, type: 'scatter', mode: 'lines', line: { color: '#58a6ff', width: 2 }, name: '5Y' },
+    { x: h.yield10y.dates, y: h.yield10y.values, type: 'scatter', mode: 'lines', line: { color: '#bc8cff', width: 2 }, name: '10Y' }
+  ], plotLayout('%'), PLOT_CONFIG);
+
+  Plotly.newPlot('chartCurve', [{ x: h.yieldCurve.dates, y: h.yieldCurve.values, type: 'scatter', mode: 'lines', line: { color: '#58a6ff', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(88,166,255,0.08)', name: '10Y−2Y' }], { ...plotLayout('pts'), showlegend: false, shapes: [{ type: 'line', x0: h.yieldCurve.dates[0], x1: h.yieldCurve.dates[h.yieldCurve.dates.length - 1], y0: 0, y1: 0, line: { color: '#484f58', width: 1, dash: 'dot' } }] }, PLOT_CONFIG);
+
+  Plotly.newPlot('chartFedFunds', [{ x: h.fedFunds.dates, y: h.fedFunds.values, type: 'scatter', mode: 'lines', line: { color: '#bc8cff', width: 2, shape: 'hv' }, name: 'Fed Funds' }], { ...plotLayout('%'), showlegend: false }, PLOT_CONFIG);
+
+  if(data.fedWatch && data.fedWatch.meetings) {
+    const fw = data.fedWatch.meetings;
+    Plotly.newPlot('chartFedWatch', [
+      { y: fw.map(m => m.label), x: fw.map(m => m.cut), type: 'bar', orientation: 'h', name: 'Recorte', marker: { color: '#3fb950' }, text: fw.map(m => m.cut + '%'), textposition: 'inside', textfont: { color: '#fff', size: 11 } },
+      { y: fw.map(m => m.label), x: fw.map(m => m.hold), type: 'bar', orientation: 'h', name: 'Mantener', marker: { color: '#8b949e' }, text: fw.map(m => m.hold + '%'), textposition: 'inside', textfont: { color: '#0d1117', size: 11 } },
+      { y: fw.map(m => m.label), x: fw.map(m => m.hike), type: 'bar', orientation: 'h', name: 'Subida', marker: { color: '#f85149' }, text: fw.map(m => m.hike + '%'), textposition: 'inside', textfont: { color: '#fff', size: 11 } }
+    ], { ...plotLayout(''), barmode: 'stack', xaxis: { ...plotLayout().xaxis, range: [0, 100], ticksuffix: '%' }, yaxis: { ...plotLayout().yaxis, autorange: 'reversed' }, margin: { l: 70, r: 15, t: 15, b: 50 } }, PLOT_CONFIG);
+  }
+
+  Plotly.newPlot('chartVix', [{ x: h.vix.dates, y: h.vix.values, type: 'scatter', mode: 'lines', line: { color: '#f85149', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(248,81,73,0.08)', name: 'VIX' }], { ...plotLayout(''), showlegend: false, shapes: [{ type: 'line', x0: h.vix.dates[0], x1: h.vix.dates[h.vix.dates.length-1], y0: 20, y1: 20, line: { color: '#d29922', width: 1, dash: 'dot' } }, { type: 'line', x0: h.vix.dates[0], x1: h.vix.dates[h.vix.dates.length-1], y0: 30, y1: 30, line: { color: '#f85149', width: 1, dash: 'dot' } }] }, PLOT_CONFIG);
+
+  Plotly.newPlot('chartDxy', [{ x: h.dxy.dates, y: h.dxy.values, type: 'scatter', mode: 'lines', line: { color: '#58a6ff', width: 2 }, name: 'DXY' }], { ...plotLayout(''), showlegend: false }, PLOT_CONFIG);
+  
+  Plotly.newPlot('chartHySpread', [{ x: h.hySpread.dates, y: h.hySpread.values, type: 'scatter', mode: 'lines', line: { color: '#ff9e64', width: 2 }, fill: 'tozeroy', fillcolor: 'rgba(255,158,100,0.08)', name: 'HY Spread' }], { ...plotLayout('%'), showlegend: false }, PLOT_CONFIG);
+
+  Plotly.newPlot('chartM2', [{ x: h.m2YoY.dates, y: h.m2YoY.values, type: 'scatter', mode: 'lines', line: { color: '#3fb950', width: 2 }, name: 'M2 YoY' }], { ...plotLayout('%'), showlegend: false, shapes: [{ type: 'line', x0: h.m2YoY.dates[0], x1: h.m2YoY.dates[h.m2YoY.dates.length-1], y0: 0, y1: 0, line: { color: '#484f58', width: 1, dash: 'dot' } }] }, PLOT_CONFIG);
+}
+
+const chartIdsByTab = {
+  growth: ['chartGdp', 'chartNfp', 'chartIsm'],
+  inflation: ['chartInflation'],
+  rates: ['chartYields', 'chartCurve', 'chartFedFunds', 'chartFedWatch'],
+  risk: ['chartVix', 'chartDxy', 'chartHySpread', 'chartM2'],
+};
+
+function activateTab(tabKey) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabKey));
+  document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tabKey));
+  (chartIdsByTab[tabKey] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.data) Plotly.Plots.resize(el);
+  });
+}
+
+async function init() {
+  try {
+    const response = await fetch('data.json');
+    if (!response.ok) throw new Error('No se pudo cargar data.json');
+    dashboardData = await response.json();
+    
+    const ts = new Date(dashboardData.lastUpdate);
+    document.getElementById('lastUpdate').textContent = ts.toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' });
+
+    renderRegime(dashboardData);
+    renderWeekCalendar(dashboardData);
+    Object.keys(indicatorDefs).forEach(key => renderIndicatorSection(dashboardData, key));
+    renderCharts(dashboardData);
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+    });
+  } catch (error) {
+    console.error(error);
+    document.getElementById('lastUpdate').textContent = "Error al cargar los datos";
+    alert("Hubo un error al leer data.json. Asegúrate de estar usando un servidor local (ver instrucciones).");
+  }
+}
+
+init();
+</script>
+</body>
+</html>
